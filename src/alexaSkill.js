@@ -7,59 +7,26 @@ function createAlexaSkill(getStreamInfoCallback) {
     },
     handle(handlerInput) {
       const info = getStreamInfoCallback();
-      console.log(`[Alexa SDK] LaunchRequest -> 1. Tocando áudio fixo de introdução (${info.introUrl})`);
+      console.log(`[Alexa SDK] LaunchRequest -> Tocando direto: ${info.url}`);
 
-      // Toca o áudio fixo inicial garantindo 100% de estabilidade de abertura
       return handlerInput.responseBuilder
         .addDirective({
           type: 'AudioPlayer.Play',
           playBehavior: 'REPLACE_ALL',
           audioItem: {
             stream: {
-              url: info.introUrl,
-              token: 'intro-fixed',
+              url: info.url,
+              token: info.token,
               offsetInMilliseconds: 0,
             },
             metadata: {
-              title: 'Iniciando Áudio do PC...',
+              title: info.title,
               subtitle: 'AlexaAudio Local',
             },
           },
         })
         .withShouldEndSession(true)
         .getResponse();
-    },
-  };
-
-  // Evento disparado pela Alexa quando o áudio fixo está perto do fim
-  // É aqui que colocamos o streaming em tempo real do computador na FILA!
-  const PlaybackNearlyFinishedHandler = {
-    canHandle(handlerInput) {
-      return Alexa.getRequestType(handlerInput.requestEnvelope) === 'AudioPlayer.PlaybackNearlyFinished';
-    },
-    handle(handlerInput) {
-      const currentToken = handlerInput.requestEnvelope.request.token;
-      const info = getStreamInfoCallback();
-      console.log(`[Alexa SDK] ⚡ PlaybackNearlyFinished para [${currentToken}] -> 2. Enfileirando áudio do PC em tempo real (${info.liveUrl})`);
-
-      return handlerInput.responseBuilder
-        .addDirective({
-          type: 'AudioPlayer.Play',
-          playBehavior: 'ENQUEUE',
-          audioItem: {
-            stream: {
-              url: info.liveUrl,
-              token: 'live-stream-continuous',
-              expectedPreviousToken: currentToken || 'intro-fixed',
-              offsetInMilliseconds: 0,
-            },
-            metadata: {
-              title: 'Áudio do PC (Ao Vivo)',
-              subtitle: 'Transmissão em Tempo Real',
-            },
-          },
-        })
-        .getResponse(); // Sem shouldEndSession em eventos de background
     },
   };
 
@@ -73,7 +40,7 @@ function createAlexaSkill(getStreamInfoCallback) {
     },
     handle(handlerInput) {
       const info = getStreamInfoCallback();
-      console.log(`[Alexa SDK] PlayIntent -> Tocando stream do PC`);
+      console.log(`[Alexa SDK] PlayIntent -> Tocando direto: ${info.url}`);
 
       return handlerInput.responseBuilder
         .addDirective({
@@ -81,13 +48,13 @@ function createAlexaSkill(getStreamInfoCallback) {
           playBehavior: 'REPLACE_ALL',
           audioItem: {
             stream: {
-              url: info.liveUrl,
-              token: 'live-stream-continuous',
+              url: info.url,
+              token: info.token,
               offsetInMilliseconds: 0,
             },
             metadata: {
-              title: 'Áudio do PC (Ao Vivo)',
-              subtitle: 'Transmissão em Tempo Real',
+              title: info.title,
+              subtitle: 'AlexaAudio Local',
             },
           },
         })
@@ -169,7 +136,6 @@ function createAlexaSkill(getStreamInfoCallback) {
   return Alexa.SkillBuilders.custom()
     .addRequestHandlers(
       LaunchRequestHandler,
-      PlaybackNearlyFinishedHandler,
       PlayIntentHandler,
       StopIntentHandler,
       PlaybackStartedHandler,

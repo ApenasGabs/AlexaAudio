@@ -56,13 +56,21 @@ function getActiveTrack() {
   return currentTrack;
 }
 
+// Inicia captura WASAPI nativa contínua
 liveAudio.start();
 
+// Configura a Skill oficial apontando direto para o áudio ativo
 const skill = createAlexaSkill(() => {
+  const active = getActiveTrack();
   const baseUrl = currentPublicUrl;
+  const isLive = playbackMode === 'live';
+
   return {
-    introUrl: `${baseUrl}/stream/intro_fixed.mp3`,
-    liveUrl: `${baseUrl}/stream/live`,
+    url: isLive 
+      ? `${baseUrl}/stream/live` 
+      : `${baseUrl}/stream/${encodeURIComponent(active || 'sample_song.mp3')}`,
+    title: isLive ? 'Áudio do PC ao Vivo' : (active || 'Áudio Local'),
+    token: isLive ? `live-stream-${Date.now()}` : (active || `file-${Date.now()}`),
   };
 });
 
@@ -77,13 +85,17 @@ app.get('/api/status', (req, res) => {
   const host = req.headers['x-forwarded-host'] || req.get('host');
   const baseUrl = currentPublicUrl || `${protocol}://${host}`;
 
+  const currentStreamUrl = playbackMode === 'live' 
+    ? `${baseUrl}/stream/live` 
+    : (active ? `${baseUrl}/stream/${encodeURIComponent(active)}` : `${baseUrl}/stream/live`);
+
   res.json({
     status: 'online',
     playbackMode,
     publicUrl: currentPublicUrl,
     activeTrack: active,
-    introStreamUrl: `${baseUrl}/stream/intro_fixed.mp3`,
     liveStreamUrl: `${baseUrl}/stream/live`,
+    activeStreamUrl: currentStreamUrl,
     alexaWebhookUrl: `${baseUrl}/alexa`,
     listenersCount: liveAudio.clients.size,
     tracks: tracks.map(name => {
@@ -155,7 +167,7 @@ app.delete('/api/tracks/:filename', (req, res) => {
 });
 
 // ==========================================
-// ROTAS DE STREAMING
+// ROTAS DE STREAMING (Live & Arquivos)
 // ==========================================
 
 app.get('/stream/live', (req, res) => {
@@ -212,11 +224,6 @@ function streamAudioFile(filePath, req, res) {
   }
 }
 
-app.get('/stream/intro_fixed.mp3', (req, res) => {
-  const filePath = path.join(MEDIA_DIR, 'intro_fixed.mp3');
-  streamAudioFile(filePath, req, res);
-});
-
 app.get('/stream/active', (req, res) => {
   if (playbackMode === 'live') {
     return res.redirect(302, '/stream/live');
@@ -248,30 +255,7 @@ app.post('/alexa', async (req, res) => {
     res.json(response);
   } catch (err) {
     console.error('[Alexa Webhook Error]:', err);
-    // Resposta de contingência direta
-    res.json({
-      version: '1.0',
-      response: {
-        directives: [
-          {
-            type: 'AudioPlayer.Play',
-            playBehavior: 'REPLACE_ALL',
-            audioItem: {
-              stream: {
-                url: `${currentPublicUrl}/stream/intro_fixed.mp3`,
-                token: 'intro-fixed',
-                offsetInMilliseconds: 0,
-              },
-              metadata: {
-                title: 'Iniciando Áudio do PC...',
-                subtitle: 'AlexaAudio Local',
-              },
-            },
-          },
-        ],
-        shouldEndSession: true,
-      },
-    });
+    res.status(500).json({ error: 'Erro no webhook' });
   }
 });
 
