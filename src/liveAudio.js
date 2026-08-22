@@ -25,11 +25,10 @@ class LiveAudioCapture extends EventEmitter {
     this.clients = new Set();
     this.port = 3001;
 
-    // Buffer de pré-carregamento de 64KB (~2.7 segundos a 192kbps)
-    // Essencial para o decodificador do Echo inicializar sem timeout
+    // Buffer de 64KB (~2.7s) mantido sempre fresco
     this.bufferCache = [];
     this.bufferCacheSize = 0;
-    this.maxCacheSize = 64 * 1024; // 64 KB
+    this.maxCacheSize = 64 * 1024;
   }
 
   start() {
@@ -46,6 +45,7 @@ class LiveAudioCapture extends EventEmitter {
         '-af', 'volume=1.75,alimiter=limit=0.98',
         '-c:a', 'libmp3lame',
         '-b:a', '192k',
+        '-reservoir', '0',
         '-flush_packets', '1',
         '-f', 'mp3',
         'pipe:1'
@@ -62,9 +62,11 @@ class LiveAudioCapture extends EventEmitter {
           this.bufferCacheSize -= removed.length;
         }
 
+        // Distribuição não-bloqueante para todos os Echos ativos
         for (const client of Array.from(this.clients)) {
           if (client.writable && !client.destroyed && !client.writableEnded) {
             try {
+              // Se o buffer do cliente estiver cheio (backpressure), não bloqueia
               client.write(chunk);
             } catch (e) {
               this.removeClient(client);
@@ -118,7 +120,7 @@ class LiveAudioCapture extends EventEmitter {
   }
 
   addClient(res) {
-    // Entrega o buffer inicial de 64KB instantaneamente
+    // Envia o pré-buffer inicial para preencher a memória do Echo instantaneamente
     if (this.bufferCache.length > 0) {
       for (const chunk of this.bufferCache) {
         try {
@@ -134,12 +136,12 @@ class LiveAudioCapture extends EventEmitter {
     this.clients.add(res);
     res.on('close', () => this.removeClient(res));
     res.on('error', () => this.removeClient(res));
-    console.log(`[LiveAudio] 🔊 Echo conectado! Total de caixas tocando: ${this.clients.size}`);
+    console.log(`[LiveAudio] 🔊 Echo conectado! Total de caixas ativas: ${this.clients.size}`);
   }
 
   removeClient(res) {
     this.clients.delete(res);
-    console.log(`[LiveAudio] Echo desconectado. Total ativo: ${this.clients.size}`);
+    console.log(`[LiveAudio] Echo desconectado. Total de caixas ativas: ${this.clients.size}`);
   }
 
   stop() {

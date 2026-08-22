@@ -7,7 +7,7 @@ function createAlexaSkill(getStreamInfoCallback) {
     },
     handle(handlerInput) {
       const info = getStreamInfoCallback();
-      console.log(`[Alexa SDK] LaunchRequest -> Tocando direto: ${info.url}`);
+      console.log(`[Alexa SDK] LaunchRequest -> Tocando: ${info.url}`);
 
       return handlerInput.responseBuilder
         .addDirective({
@@ -40,7 +40,7 @@ function createAlexaSkill(getStreamInfoCallback) {
     },
     handle(handlerInput) {
       const info = getStreamInfoCallback();
-      console.log(`[Alexa SDK] PlayIntent -> Tocando direto: ${info.url}`);
+      console.log(`[Alexa SDK] PlayIntent/ResumeIntent -> Tocando: ${info.url}`);
 
       return handlerInput.responseBuilder
         .addDirective({
@@ -73,12 +73,13 @@ function createAlexaSkill(getStreamInfoCallback) {
       );
     },
     handle(handlerInput) {
-      console.log(`[Alexa SDK] Parando áudio.`);
+      console.log(`[Alexa SDK] 🛑 StopIntent recebido -> Parando AudioPlayer.`);
+
+      // Na diretiva AudioPlayer.Stop oficial, shouldEndSession NÃO deve ser enviado
       return handlerInput.responseBuilder
         .addDirective({
           type: 'AudioPlayer.Stop',
         })
-        .withShouldEndSession(true)
         .getResponse();
     },
   };
@@ -89,7 +90,18 @@ function createAlexaSkill(getStreamInfoCallback) {
     },
     handle(handlerInput) {
       const token = handlerInput.requestEnvelope.request.token;
-      console.log(`[Alexa SDK] 🎵 AudioPlayer.PlaybackStarted com token: [${token}]`);
+      console.log(`[Alexa SDK] 🎵 AudioPlayer.PlaybackStarted [${token}]`);
+      return handlerInput.responseBuilder.getResponse();
+    },
+  };
+
+  const PlaybackStoppedHandler = {
+    canHandle(handlerInput) {
+      return Alexa.getRequestType(handlerInput.requestEnvelope) === 'AudioPlayer.PlaybackStopped';
+    },
+    handle(handlerInput) {
+      const token = handlerInput.requestEnvelope.request.token;
+      console.log(`[Alexa SDK] ⏹️ AudioPlayer.PlaybackStopped [${token}]`);
       return handlerInput.responseBuilder.getResponse();
     },
   };
@@ -128,7 +140,7 @@ function createAlexaSkill(getStreamInfoCallback) {
       return true;
     },
     handle(handlerInput, error) {
-      console.error('[Alexa SDK] Erro Handler:', error);
+      console.error('[Alexa SDK] Erro no processamento:', error);
       return handlerInput.responseBuilder.getResponse();
     },
   };
@@ -139,6 +151,7 @@ function createAlexaSkill(getStreamInfoCallback) {
       PlayIntentHandler,
       StopIntentHandler,
       PlaybackStartedHandler,
+      PlaybackStoppedHandler,
       PlaybackFailedHandler,
       AudioPlayerEventHandler,
       SessionEndedRequestHandler
