@@ -59,7 +59,7 @@ function getActiveTrack() {
 // Inicia captura WASAPI nativa contínua
 liveAudio.start();
 
-// Configura a Skill oficial apontando para URLs com extensão .mp3 obrigatória pela Amazon
+// Configura a Skill oficial
 const skill = createAlexaSkill(() => {
   const active = getActiveTrack();
   const baseUrl = currentPublicUrl;
@@ -167,7 +167,7 @@ app.delete('/api/tracks/:filename', (req, res) => {
 });
 
 // ==========================================
-// ROTAS DE STREAMING (Live & Arquivos)
+// ROTAS DE STREAMING (Headers HTTP Padrão Amazon AudioPlayer)
 // ==========================================
 
 function handleLiveStream(req, res) {
@@ -179,18 +179,12 @@ function handleLiveStream(req, res) {
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
     'Expires': '0',
-    'Accept-Ranges': 'none',
     'Access-Control-Allow-Origin': '*',
-    'icy-notice1': 'AlexaAudio Live PC Stream',
-    'icy-name': 'PC Audio Live',
-    'icy-genre': 'Live',
-    'icy-br': '192',
   });
 
   liveAudio.addClient(res);
 }
 
-// Aceita tanto /stream/live quanto /stream/live.mp3 (exigido pelo AudioPlayer)
 app.get('/stream/live.mp3', handleLiveStream);
 app.get('/stream/live', handleLiveStream);
 
