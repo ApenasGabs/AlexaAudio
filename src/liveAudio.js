@@ -1,5 +1,5 @@
 const net = require('net');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 const ffmpegPath = require('ffmpeg-static');
 const EventEmitter = require('events');
@@ -15,6 +15,13 @@ function toWindowsPath(p) {
   return resolved;
 }
 
+function killOrphanProcesses() {
+  try {
+    // Mata qualquer ffmpeg ou capturador órfão de execuções passadas
+    execSync('taskkill /F /IM ffmpeg.exe /T 2>nul || exit 0', { shell: 'cmd.exe' });
+  } catch (e) {}
+}
+
 class LiveAudioCapture extends EventEmitter {
   constructor() {
     super();
@@ -25,7 +32,7 @@ class LiveAudioCapture extends EventEmitter {
     this.clients = new Set();
     this.port = 3001;
 
-    // Buffer de 64KB (~4 segundos a 128kbps) para pré-carregamento suave
+    // Buffer de 64KB (~4s a 128kbps) para pré-carregamento instantâneo
     this.bufferCache = [];
     this.bufferCacheSize = 0;
     this.maxCacheSize = 64 * 1024;
@@ -34,8 +41,15 @@ class LiveAudioCapture extends EventEmitter {
   start() {
     if (this.isRunning) return;
 
+    // Limpeza de processos residuais
+    killOrphanProcesses();
+
     this.server = net.createServer((socket) => {
       console.log('[LiveAudio] 🎧 Conexão WASAPI nativa estabelecida com sucesso.');
+
+      if (this.ffmpegProcess) {
+        try { this.ffmpegProcess.kill(); } catch (e) {}
+      }
 
       this.ffmpegProcess = spawn(ffmpegPath, [
         '-f', 'f32le',
@@ -81,7 +95,7 @@ class LiveAudioCapture extends EventEmitter {
       socket.on('close', () => {
         console.log('[LiveAudio] Conexão do capturador encerrada.');
         if (this.ffmpegProcess) {
-          this.ffmpegProcess.kill();
+          try { this.ffmpegProcess.kill(); } catch (e) {}
           this.ffmpegProcess = null;
         }
       });
@@ -114,6 +128,16 @@ class LiveAudioCapture extends EventEmitter {
 
       this.isRunning = true;
     });
+
+    // Cleanup ao encerrar o Node.js
+    const cleanExit = () => {
+      this.stop();
+      killOrphanProcesses();
+    };
+
+    process.on('exit', cleanExit);
+    process.on('SIGINT', cleanExit);
+    process.on('SIGTERM', cleanExit);
   }
 
   addClient(res) {
@@ -142,15 +166,15 @@ class LiveAudioCapture extends EventEmitter {
 
   stop() {
     if (this.psProcess) {
-      this.psProcess.kill();
+      try { this.psProcess.kill(); } catch (e) {}
       this.psProcess = null;
     }
     if (this.ffmpegProcess) {
-      this.ffmpegProcess.kill();
+      try { this.ffmpegProcess.kill(); } catch (e) {}
       this.ffmpegProcess = null;
     }
     if (this.server) {
-      this.server.close();
+      try { this.server.close(); } catch (e) {}
       this.server = null;
     }
     this.isRunning = false;
