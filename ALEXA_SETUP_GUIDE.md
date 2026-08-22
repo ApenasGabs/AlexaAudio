@@ -64,9 +64,9 @@ Ele gerará uma URL como: `https://xxxx.ngrok-free.app`
    - No menu lateral, vá em **Endpoint**.
    - Selecione **HTTPS**.
    - No campo **Default Region**, cole o seu endpoint do webhook:
-     `https://SUA-URL-DO-TUNEL.com/alexa`
+     `https://pc-gamer.tailf82141.ts.net/alexa`
    - No dropdown de certificado SSL (*Select SSL certificate type*), selecione:
-     `My development endpoint is a sub-domain of a domain that has a wildcard certificate from a certificate authority` (se usar ngrok ou Cloudflare).
+     `My development endpoint is a sub-domain of a domain that has a wildcard certificate from a certificate authority` (*.ts.net possui certificado wildcard confiável).
    - Clique em **Save Endpoints**.
 
 ---
