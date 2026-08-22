@@ -14,17 +14,17 @@ class LiveAudioCapture extends EventEmitter {
     this.clients = new Set();
     this.port = 3001;
 
-    // Buffer circular para pré-buffer inicial dos ouvintes (~64KB de áudio MP3)
+    // Buffer circular de pré-carregamento para o Echo (~64KB)
     this.bufferCache = [];
     this.bufferCacheSize = 0;
-    this.maxCacheSize = 64 * 1024; // 64 KB
+    this.maxCacheSize = 64 * 1024;
   }
 
   start() {
     if (this.isRunning) return;
 
     this.server = net.createServer((socket) => {
-      console.log('[LiveAudio] 🎧 Conexão WASAPI de áudio estabelecida.');
+      console.log('[LiveAudio] 🎧 Conexão WASAPI nativa C# de alta performance estabelecida.');
 
       this.ffmpegProcess = spawn(ffmpegPath, [
         '-f', 'f32le',
@@ -41,7 +41,7 @@ class LiveAudioCapture extends EventEmitter {
       socket.pipe(this.ffmpegProcess.stdin);
 
       this.ffmpegProcess.stdout.on('data', (chunk) => {
-        // Atualiza o buffer circular inicial
+        // Atualiza ring buffer
         this.bufferCache.push(chunk);
         this.bufferCacheSize += chunk.length;
 
@@ -50,7 +50,7 @@ class LiveAudioCapture extends EventEmitter {
           this.bufferCacheSize -= removed.length;
         }
 
-        // Transmite o chunk de MP3 para todos os clientes conectados (Alexas/Navegadores)
+        // Transmite o chunk de MP3 sem atraso para todos os ouvintes
         for (const client of this.clients) {
           try {
             client.write(chunk);
@@ -58,10 +58,6 @@ class LiveAudioCapture extends EventEmitter {
             this.removeClient(client);
           }
         }
-      });
-
-      this.ffmpegProcess.stderr.on('data', (d) => {
-        // Silencia logs comuns do ffmpeg
       });
 
       this.ffmpegProcess.on('error', (err) => {
@@ -80,21 +76,22 @@ class LiveAudioCapture extends EventEmitter {
     this.server.listen(this.port, '127.0.0.1', () => {
       console.log(`[LiveAudio] Servidor TCP de áudio escutando em 127.0.0.1:${this.port}`);
 
-      // Inicia o processo PowerShell de captura de loopback
-      const scriptPath = path.join(__dirname, '..', 'scripts', 'stream_audio_tcp.ps1');
+      // Executa o capturador C# em memória de latência zero
+      const scriptPath = path.join(__dirname, '..', 'scripts', 'run_wasapi_in_memory.ps1');
       this.psProcess = spawn('powershell.exe', [
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',
-        '-File', scriptPath
+        '-File', scriptPath,
+        '-Port', `${this.port}`
       ]);
 
       this.psProcess.stderr.on('data', (d) => {
         const msg = d.toString().trim();
-        if (msg) console.log(`[WASAPI Capture] ${msg}`);
+        if (msg) console.log(`[WASAPI Core] ${msg}`);
       });
 
       this.psProcess.on('exit', (code) => {
-        console.log(`[LiveAudio] Processo PowerShell encerrado com código ${code}`);
+        console.log(`[LiveAudio] Processo de captura encerrado com código ${code}`);
         this.isRunning = false;
       });
 
@@ -103,7 +100,7 @@ class LiveAudioCapture extends EventEmitter {
   }
 
   addClient(res) {
-    // Envia o pré-buffer acumulado para o player (Alexa/Navegador) iniciar instantaneamente
+    // Envia o pré-buffer para sincronização imediata
     if (this.bufferCache.length > 0) {
       for (const chunk of this.bufferCache) {
         try {
