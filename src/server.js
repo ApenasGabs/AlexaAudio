@@ -59,7 +59,7 @@ function getActiveTrack() {
 // Inicia captura WASAPI nativa contínua
 liveAudio.start();
 
-// Configura a Skill oficial apontando direto para o áudio ativo
+// Configura a Skill oficial apontando para URLs com extensão .mp3 obrigatória pela Amazon
 const skill = createAlexaSkill(() => {
   const active = getActiveTrack();
   const baseUrl = currentPublicUrl;
@@ -67,7 +67,7 @@ const skill = createAlexaSkill(() => {
 
   return {
     url: isLive 
-      ? `${baseUrl}/stream/live` 
+      ? `${baseUrl}/stream/live.mp3` 
       : `${baseUrl}/stream/${encodeURIComponent(active || 'sample_song.mp3')}`,
     title: isLive ? 'Áudio do PC ao Vivo' : (active || 'Áudio Local'),
     token: isLive ? `live-stream-${Date.now()}` : (active || `file-${Date.now()}`),
@@ -86,15 +86,15 @@ app.get('/api/status', (req, res) => {
   const baseUrl = currentPublicUrl || `${protocol}://${host}`;
 
   const currentStreamUrl = playbackMode === 'live' 
-    ? `${baseUrl}/stream/live` 
-    : (active ? `${baseUrl}/stream/${encodeURIComponent(active)}` : `${baseUrl}/stream/live`);
+    ? `${baseUrl}/stream/live.mp3` 
+    : (active ? `${baseUrl}/stream/${encodeURIComponent(active)}` : `${baseUrl}/stream/live.mp3`);
 
   res.json({
     status: 'online',
     playbackMode,
     publicUrl: currentPublicUrl,
     activeTrack: active,
-    liveStreamUrl: `${baseUrl}/stream/live`,
+    liveStreamUrl: `${baseUrl}/stream/live.mp3`,
     activeStreamUrl: currentStreamUrl,
     alexaWebhookUrl: `${baseUrl}/alexa`,
     listenersCount: liveAudio.clients.size,
@@ -170,8 +170,8 @@ app.delete('/api/tracks/:filename', (req, res) => {
 // ROTAS DE STREAMING (Live & Arquivos)
 // ==========================================
 
-app.get('/stream/live', (req, res) => {
-  console.log(`[HTTP /stream/live] Conexão recebida de ${req.ip}`);
+function handleLiveStream(req, res) {
+  console.log(`[HTTP /stream/live.mp3] Conexão recebida de ${req.ip}`);
 
   res.writeHead(200, {
     'Content-Type': 'audio/mpeg',
@@ -188,7 +188,11 @@ app.get('/stream/live', (req, res) => {
   });
 
   liveAudio.addClient(res);
-});
+}
+
+// Aceita tanto /stream/live quanto /stream/live.mp3 (exigido pelo AudioPlayer)
+app.get('/stream/live.mp3', handleLiveStream);
+app.get('/stream/live', handleLiveStream);
 
 function streamAudioFile(filePath, req, res) {
   if (!fs.existsSync(filePath)) {
@@ -224,21 +228,25 @@ function streamAudioFile(filePath, req, res) {
   }
 }
 
-app.get('/stream/active', (req, res) => {
+app.get('/stream/active.mp3', (req, res) => {
   if (playbackMode === 'live') {
-    return res.redirect(302, '/stream/live');
+    return handleLiveStream(req, res);
   }
   const active = getActiveTrack();
   if (!active) {
-    return res.redirect(302, '/stream/live');
+    return handleLiveStream(req, res);
   }
   streamAudioFile(path.join(MEDIA_DIR, active), req, res);
 });
 
+app.get('/stream/active', (req, res) => {
+  res.redirect(302, '/stream/active.mp3');
+});
+
 app.get('/stream/:filename', (req, res) => {
   const filename = req.params.filename;
-  if (filename === 'live') {
-    return res.redirect(302, '/stream/live');
+  if (filename === 'live' || filename === 'live.mp3') {
+    return handleLiveStream(req, res);
   }
   const filePath = path.join(MEDIA_DIR, filename);
   streamAudioFile(filePath, req, res);
