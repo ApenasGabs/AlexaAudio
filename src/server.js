@@ -56,22 +56,15 @@ function getActiveTrack() {
   return currentTrack;
 }
 
-// Inicia captura de áudio nativa contínua
+// Inicia captura WASAPI nativa
 liveAudio.start();
 
-// Configura a Skill oficial com suporte a chime e fila
+// Configura a Skill oficial com o áudio fixo de introdução e o live stream na fila
 const skill = createAlexaSkill(() => {
-  const active = getActiveTrack();
   const baseUrl = currentPublicUrl;
-  const isLive = playbackMode === 'live';
-
   return {
-    chimeUrl: `${baseUrl}/stream/connect_chime.mp3`,
-    url: isLive 
-      ? `${baseUrl}/stream/live` 
-      : `${baseUrl}/stream/${encodeURIComponent(active || 'sample_song.mp3')}`,
-    title: isLive ? 'Áudio do PC ao Vivo' : (active || 'Áudio Local'),
-    token: isLive ? 'live-stream-continuous' : (active || `file-${Date.now()}`),
+    introUrl: `${baseUrl}/stream/intro_fixed.mp3`,
+    liveUrl: `${baseUrl}/stream/live`,
   };
 });
 
@@ -86,17 +79,13 @@ app.get('/api/status', (req, res) => {
   const host = req.headers['x-forwarded-host'] || req.get('host');
   const baseUrl = currentPublicUrl || `${protocol}://${host}`;
 
-  const currentStreamUrl = playbackMode === 'live' 
-    ? `${baseUrl}/stream/live` 
-    : (active ? `${baseUrl}/stream/${encodeURIComponent(active)}` : `${baseUrl}/stream/live`);
-
   res.json({
     status: 'online',
     playbackMode,
     publicUrl: currentPublicUrl,
     activeTrack: active,
+    introStreamUrl: `${baseUrl}/stream/intro_fixed.mp3`,
     liveStreamUrl: `${baseUrl}/stream/live`,
-    activeStreamUrl: currentStreamUrl,
     alexaWebhookUrl: `${baseUrl}/alexa`,
     listenersCount: liveAudio.clients.size,
     tracks: tracks.map(name => {
@@ -168,7 +157,7 @@ app.delete('/api/tracks/:filename', (req, res) => {
 });
 
 // ==========================================
-// ROTAS DE STREAMING
+// ROTAS DE STREAMING (Live & Arquivos com Range)
 // ==========================================
 
 app.get('/stream/live', (req, res) => {
@@ -224,6 +213,11 @@ function streamAudioFile(filePath, req, res) {
     fs.createReadStream(filePath).pipe(res);
   }
 }
+
+app.get('/stream/intro_fixed.mp3', (req, res) => {
+  const filePath = path.join(MEDIA_DIR, 'intro_fixed.mp3');
+  streamAudioFile(filePath, req, res);
+});
 
 app.get('/stream/active', (req, res) => {
   if (playbackMode === 'live') {
