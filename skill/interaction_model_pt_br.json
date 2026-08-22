@@ -1,0 +1,57 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "áudio local",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": [
+            "parar música",
+            "parar áudio"
+          ]
+        },
+        {
+          "name": "AMAZON.PauseIntent",
+          "samples": [
+            "pausar áudio",
+            "pausar música"
+          ]
+        },
+        {
+          "name": "AMAZON.ResumeIntent",
+          "samples": [
+            "continuar",
+            "retomar música"
+          ]
+        },
+        {
+          "name": "AMAZON.NextIntent",
+          "samples": [
+            "próxima",
+            "próxima música",
+            "avançar"
+          ]
+        },
+        {
+          "name": "PlayIntent",
+          "slots": [],
+          "samples": [
+            "tocar",
+            "tocar música",
+            "iniciar",
+            "tocar áudio do computador"
+          ]
+        }
+      ],
+      "types": []
+    }
+  }
+}
