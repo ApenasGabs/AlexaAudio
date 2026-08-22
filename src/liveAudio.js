@@ -14,17 +14,18 @@ class LiveAudioCapture extends EventEmitter {
     this.clients = new Set();
     this.port = 3001;
 
-    // Buffer circular de pré-carregamento para o Echo (~64KB)
+    // Ring buffer aumentado para 128KB (~8 segundos a 128kbps) para suportar
+    // conexões simultâneas de múltiplos Echos no modo "A Casa Toda"
     this.bufferCache = [];
     this.bufferCacheSize = 0;
-    this.maxCacheSize = 64 * 1024;
+    this.maxCacheSize = 128 * 1024; // 128 KB
   }
 
   start() {
     if (this.isRunning) return;
 
     this.server = net.createServer((socket) => {
-      console.log('[LiveAudio] 🎧 Conexão WASAPI nativa C# de alta performance estabelecida.');
+      console.log('[LiveAudio] 🎧 Conexão WASAPI nativa estabelecida.');
 
       this.ffmpegProcess = spawn(ffmpegPath, [
         '-f', 'f32le',
@@ -41,7 +42,7 @@ class LiveAudioCapture extends EventEmitter {
       socket.pipe(this.ffmpegProcess.stdin);
 
       this.ffmpegProcess.stdout.on('data', (chunk) => {
-        // Atualiza ring buffer
+        // Armazena no cache inicial
         this.bufferCache.push(chunk);
         this.bufferCacheSize += chunk.length;
 
@@ -50,7 +51,7 @@ class LiveAudioCapture extends EventEmitter {
           this.bufferCacheSize -= removed.length;
         }
 
-        // Transmite o chunk de MP3 sem atraso para todos os ouvintes
+        // Distribui para todos os Echos conectados
         for (const client of this.clients) {
           try {
             client.write(chunk);
@@ -76,7 +77,6 @@ class LiveAudioCapture extends EventEmitter {
     this.server.listen(this.port, '127.0.0.1', () => {
       console.log(`[LiveAudio] Servidor TCP de áudio escutando em 127.0.0.1:${this.port}`);
 
-      // Executa o capturador C# em memória de latência zero
       const scriptPath = path.join(__dirname, '..', 'scripts', 'run_wasapi_in_memory.ps1');
       this.psProcess = spawn('powershell.exe', [
         '-NoProfile',
@@ -100,7 +100,7 @@ class LiveAudioCapture extends EventEmitter {
   }
 
   addClient(res) {
-    // Envia o pré-buffer para sincronização imediata
+    // Envia o pré-buffer completo para sincronizar múltiplos Echos instantaneamente
     if (this.bufferCache.length > 0) {
       for (const chunk of this.bufferCache) {
         try {
@@ -113,12 +113,12 @@ class LiveAudioCapture extends EventEmitter {
 
     this.clients.add(res);
     res.on('close', () => this.removeClient(res));
-    console.log(`[LiveAudio] Novo ouvinte conectado. Total de ouvintes: ${this.clients.size}`);
+    console.log(`[LiveAudio] 🔊 Echo/Ouvinte conectado! Total de caixas tocando: ${this.clients.size}`);
   }
 
   removeClient(res) {
     this.clients.delete(res);
-    console.log(`[LiveAudio] Ouvinte desconectado. Total de ouvintes: ${this.clients.size}`);
+    console.log(`[LiveAudio] Echo desconectado. Total ativo: ${this.clients.size}`);
   }
 
   stop() {
