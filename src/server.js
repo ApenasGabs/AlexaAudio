@@ -56,10 +56,8 @@ function getActiveTrack() {
   return currentTrack;
 }
 
-// Inicia captura WASAPI nativa
 liveAudio.start();
 
-// Configura a Skill oficial com o áudio fixo de introdução e o live stream na fila
 const skill = createAlexaSkill(() => {
   const baseUrl = currentPublicUrl;
   return {
@@ -157,7 +155,7 @@ app.delete('/api/tracks/:filename', (req, res) => {
 });
 
 // ==========================================
-// ROTAS DE STREAMING (Live & Arquivos com Range)
+// ROTAS DE STREAMING
 // ==========================================
 
 app.get('/stream/live', (req, res) => {
@@ -245,10 +243,35 @@ app.get('/stream/:filename', (req, res) => {
 app.post('/alexa', async (req, res) => {
   try {
     const response = await skill.invoke(req.body);
+    console.log(`[Alexa Webhook] Resposta enviada com sucesso para type: ${req.body?.request?.type}`);
+    res.setHeader('Content-Type', 'application/json;charset=UTF-8');
     res.json(response);
   } catch (err) {
     console.error('[Alexa Webhook Error]:', err);
-    res.status(500).json({ error: 'Erro ao invocar skill.' });
+    // Resposta de contingência direta
+    res.json({
+      version: '1.0',
+      response: {
+        directives: [
+          {
+            type: 'AudioPlayer.Play',
+            playBehavior: 'REPLACE_ALL',
+            audioItem: {
+              stream: {
+                url: `${currentPublicUrl}/stream/intro_fixed.mp3`,
+                token: 'intro-fixed',
+                offsetInMilliseconds: 0,
+              },
+              metadata: {
+                title: 'Iniciando Áudio do PC...',
+                subtitle: 'AlexaAudio Local',
+              },
+            },
+          },
+        ],
+        shouldEndSession: true,
+      },
+    });
   }
 });
 
