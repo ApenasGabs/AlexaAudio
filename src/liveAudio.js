@@ -14,10 +14,10 @@ class LiveAudioCapture extends EventEmitter {
     this.clients = new Set();
     this.port = 3001;
 
-    // Buffer circular de apenas 1 segundo (~24KB a 192kbps) para evitar qualquer delay ou áudio passado
+    // Buffer de sincronização imediata (1 frame independente ~12KB)
     this.bufferCache = [];
     this.bufferCacheSize = 0;
-    this.maxCacheSize = 24 * 1024; // 24 KB (~1 segundo)
+    this.maxCacheSize = 16 * 1024;
   }
 
   start() {
@@ -26,6 +26,9 @@ class LiveAudioCapture extends EventEmitter {
     this.server = net.createServer((socket) => {
       console.log('[LiveAudio] 🎧 Conexão WASAPI nativa estabelecida.');
 
+      // Flags de MP3 Broadcast:
+      // -reservoir 0: Garante que cada frame MP3 seja 100% independente, permitindo
+      // que o Echo decodifique o stream instantaneamente ao conectar!
       this.ffmpegProcess = spawn(ffmpegPath, [
         '-f', 'f32le',
         '-ar', '48000',
@@ -34,6 +37,7 @@ class LiveAudioCapture extends EventEmitter {
         '-af', 'volume=1.75,alimiter=limit=0.98',
         '-c:a', 'libmp3lame',
         '-b:a', '192k',
+        '-reservoir', '0',
         '-flush_packets', '1',
         '-f', 'mp3',
         'pipe:1'
@@ -42,7 +46,6 @@ class LiveAudioCapture extends EventEmitter {
       socket.pipe(this.ffmpegProcess.stdin);
 
       this.ffmpegProcess.stdout.on('data', (chunk) => {
-        // Mantém apenas o último 1 segundo no buffer
         this.bufferCache.push(chunk);
         this.bufferCacheSize += chunk.length;
 
@@ -51,11 +54,15 @@ class LiveAudioCapture extends EventEmitter {
           this.bufferCacheSize -= removed.length;
         }
 
-        // Transmite o chunk de áudio em tempo real para todas as Alexas conectadas
-        for (const client of this.clients) {
-          try {
-            client.write(chunk);
-          } catch (e) {
+        // Distribui para todas as conexões ativas
+        for (const client of Array.from(this.clients)) {
+          if (client.writable && !client.destroyed && !client.writableEnded) {
+            try {
+              client.write(chunk);
+            } catch (e) {
+              this.removeClient(client);
+            }
+          } else {
             this.removeClient(client);
           }
         }
@@ -100,11 +107,12 @@ class LiveAudioCapture extends EventEmitter {
   }
 
   addClient(res) {
-    // Envia o pré-buffer de 1s para o Echo iniciar sem delay e já sincronizado
     if (this.bufferCache.length > 0) {
       for (const chunk of this.bufferCache) {
         try {
-          res.write(chunk);
+          if (res.writable && !res.destroyed) {
+            res.write(chunk);
+          }
         } catch (e) {
           return;
         }
@@ -113,6 +121,7 @@ class LiveAudioCapture extends EventEmitter {
 
     this.clients.add(res);
     res.on('close', () => this.removeClient(res));
+    res.on('error', () => this.removeClient(res));
     console.log(`[LiveAudio] 🔊 Echo/Ouvinte conectado! Total de caixas tocando: ${this.clients.size}`);
   }
 
