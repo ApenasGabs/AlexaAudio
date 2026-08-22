@@ -13,32 +13,23 @@
         },
         {
           "name": "AMAZON.StopIntent",
-          "samples": [
-            "parar música",
-            "parar áudio"
-          ]
+          "samples": []
         },
         {
           "name": "AMAZON.PauseIntent",
-          "samples": [
-            "pausar áudio",
-            "pausar música"
-          ]
+          "samples": []
         },
         {
           "name": "AMAZON.ResumeIntent",
-          "samples": [
-            "continuar",
-            "retomar música"
-          ]
+          "samples": []
         },
         {
           "name": "AMAZON.NextIntent",
-          "samples": [
-            "próxima",
-            "próxima música",
-            "avançar"
-          ]
+          "samples": []
+        },
+        {
+          "name": "AMAZON.PreviousIntent",
+          "samples": []
         },
         {
           "name": "PlayIntent",
@@ -47,6 +38,7 @@
             "tocar",
             "tocar música",
             "iniciar",
+            "tocar áudio",
             "tocar áudio do computador"
           ]
         }
