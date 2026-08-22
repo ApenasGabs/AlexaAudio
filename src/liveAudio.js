@@ -4,6 +4,17 @@ const path = require('path');
 const ffmpegPath = require('ffmpeg-static');
 const EventEmitter = require('events');
 
+function toWindowsPath(p) {
+  let resolved = path.resolve(p);
+  if (resolved.startsWith('/mnt/')) {
+    const match = resolved.match(/^\/mnt\/([a-zA-Z])\/(.*)$/);
+    if (match) {
+      return `${match[1].toUpperCase()}:\\${match[2].replace(/\//g, '\\')}`;
+    }
+  }
+  return resolved;
+}
+
 class LiveAudioCapture extends EventEmitter {
   constructor() {
     super();
@@ -14,7 +25,7 @@ class LiveAudioCapture extends EventEmitter {
     this.clients = new Set();
     this.port = 3001;
 
-    // Buffer de sincronização imediata (1 frame independente ~12KB)
+    // Buffer de sincronização imediata
     this.bufferCache = [];
     this.bufferCacheSize = 0;
     this.maxCacheSize = 16 * 1024;
@@ -24,11 +35,8 @@ class LiveAudioCapture extends EventEmitter {
     if (this.isRunning) return;
 
     this.server = net.createServer((socket) => {
-      console.log('[LiveAudio] 🎧 Conexão WASAPI nativa estabelecida.');
+      console.log('[LiveAudio] 🎧 Conexão WASAPI nativa estabelecida com sucesso.');
 
-      // Flags de MP3 Broadcast:
-      // -reservoir 0: Garante que cada frame MP3 seja 100% independente, permitindo
-      // que o Echo decodifique o stream instantaneamente ao conectar!
       this.ffmpegProcess = spawn(ffmpegPath, [
         '-f', 'f32le',
         '-ar', '48000',
@@ -54,7 +62,6 @@ class LiveAudioCapture extends EventEmitter {
           this.bufferCacheSize -= removed.length;
         }
 
-        // Distribui para todas as conexões ativas
         for (const client of Array.from(this.clients)) {
           if (client.writable && !client.destroyed && !client.writableEnded) {
             try {
@@ -84,11 +91,15 @@ class LiveAudioCapture extends EventEmitter {
     this.server.listen(this.port, '127.0.0.1', () => {
       console.log(`[LiveAudio] Servidor TCP de áudio escutando em 127.0.0.1:${this.port}`);
 
-      const scriptPath = path.join(__dirname, '..', 'scripts', 'run_wasapi_in_memory.ps1');
+      const rawScriptPath = path.join(__dirname, '..', 'scripts', 'run_wasapi_in_memory.ps1');
+      const winScriptPath = toWindowsPath(rawScriptPath);
+
+      console.log(`[LiveAudio] Iniciando capturador WASAPI: ${winScriptPath}`);
+
       this.psProcess = spawn('powershell.exe', [
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',
-        '-File', scriptPath,
+        '-File', winScriptPath,
         '-Port', `${this.port}`
       ]);
 

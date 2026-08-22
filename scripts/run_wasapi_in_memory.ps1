@@ -4,8 +4,15 @@ param(
 )
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
+
 $binDir = Join-Path (Split-Path -Parent $scriptDir) "bin"
 $naudioDll = Join-Path $binDir "NAudio.dll"
+
+if (-not (Test-Path $naudioDll)) {
+    $binDir = Join-Path $scriptDir "bin"
+    $naudioDll = Join-Path $binDir "NAudio.dll"
+}
 
 [System.Reflection.Assembly]::LoadFrom($naudioDll) | Out-Null
 
@@ -63,9 +70,6 @@ public class WasapiStreamer
 
             capture.StartRecording();
 
-            // Thread de Heartbeat de Silêncio: se o Windows estiver mudo,
-            // injeta silêncio a cada 20ms para manter o encoder FFmpeg e o stream da Alexa vivos e em tempo real!
-            // 48000Hz * 2 canais * 4 bytes (float32) * 0.02s = 7680 bytes a cada 20ms
             int silenceBytes = (int)(capture.WaveFormat.SampleRate * capture.WaveFormat.Channels * (capture.WaveFormat.BitsPerSample / 8) * 0.02);
             byte[] silenceBuffer = new byte[silenceBytes];
 
@@ -77,7 +81,6 @@ public class WasapiStreamer
                     long last = Interlocked.Read(ref lastDataTicks);
                     long diffMs = (DateTime.UtcNow.Ticks - last) / TimeSpan.TicksPerMillisecond;
 
-                    // Se não houver som ativo há mais de 40ms, envia frame de silêncio contínuo
                     if (diffMs > 40)
                     {
                         try
