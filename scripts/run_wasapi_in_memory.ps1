@@ -29,6 +29,7 @@ public class WasapiStreamer
     private static WasapiLoopbackCapture capture;
     private static long lastDataTicks = 0;
     private static bool isRunning = true;
+    private static readonly object streamLock = new object();
 
     public static void Start(string host, int port)
     {
@@ -53,7 +54,10 @@ public class WasapiStreamer
                 {
                     try
                     {
-                        stream.Write(e.Buffer, 0, e.BytesRecorded);
+                        lock (streamLock)
+                        {
+                            stream.Write(e.Buffer, 0, e.BytesRecorded);
+                        }
                         Interlocked.Exchange(ref lastDataTicks, DateTime.UtcNow.Ticks);
                     }
                     catch (Exception)
@@ -70,6 +74,7 @@ public class WasapiStreamer
 
             capture.StartRecording();
 
+            // Gera silêncio estritamente a 48kHz estéreo float32 (20ms = 7680 bytes)
             int silenceBytes = (int)(capture.WaveFormat.SampleRate * capture.WaveFormat.Channels * (capture.WaveFormat.BitsPerSample / 8) * 0.02);
             byte[] silenceBuffer = new byte[silenceBytes];
 
@@ -81,11 +86,15 @@ public class WasapiStreamer
                     long last = Interlocked.Read(ref lastDataTicks);
                     long diffMs = (DateTime.UtcNow.Ticks - last) / TimeSpan.TicksPerMillisecond;
 
-                    if (diffMs > 40)
+                    // Se não houver som do Windows por mais de 80ms, envia silêncio sincronizado
+                    if (diffMs > 80)
                     {
                         try
                         {
-                            stream.Write(silenceBuffer, 0, silenceBuffer.Length);
+                            lock (streamLock)
+                            {
+                                stream.Write(silenceBuffer, 0, silenceBuffer.Length);
+                            }
                         }
                         catch (Exception)
                         {
@@ -96,6 +105,7 @@ public class WasapiStreamer
             });
 
             silenceThread.IsBackground = true;
+            silenceThread.Priority = ThreadPriority.Lowest;
             silenceThread.Start();
 
             while (isRunning)

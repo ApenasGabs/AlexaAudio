@@ -25,7 +25,7 @@ class LiveAudioCapture extends EventEmitter {
     this.clients = new Set();
     this.port = 3001;
 
-    // Buffer de 64KB (~2.7s) mantido sempre fresco
+    // Buffer de 64KB (~4 segundos a 128kbps) para pré-carregamento suave
     this.bufferCache = [];
     this.bufferCacheSize = 0;
     this.maxCacheSize = 64 * 1024;
@@ -44,8 +44,7 @@ class LiveAudioCapture extends EventEmitter {
         '-i', 'pipe:0',
         '-af', 'volume=1.75,alimiter=limit=0.98',
         '-c:a', 'libmp3lame',
-        '-b:a', '192k',
-        '-reservoir', '0',
+        '-b:a', '128k',
         '-flush_packets', '1',
         '-f', 'mp3',
         'pipe:1'
@@ -62,11 +61,9 @@ class LiveAudioCapture extends EventEmitter {
           this.bufferCacheSize -= removed.length;
         }
 
-        // Distribuição não-bloqueante para todos os Echos ativos
         for (const client of Array.from(this.clients)) {
           if (client.writable && !client.destroyed && !client.writableEnded) {
             try {
-              // Se o buffer do cliente estiver cheio (backpressure), não bloqueia
               client.write(chunk);
             } catch (e) {
               this.removeClient(client);
@@ -120,7 +117,6 @@ class LiveAudioCapture extends EventEmitter {
   }
 
   addClient(res) {
-    // Envia o pré-buffer inicial para preencher a memória do Echo instantaneamente
     if (this.bufferCache.length > 0) {
       for (const chunk of this.bufferCache) {
         try {
