@@ -7,12 +7,18 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js"
   },
-  "keywords": ["alexa", "audio", "streaming", "mp3"],
+  "keywords": [
+    "alexa",
+    "audio",
+    "streaming",
+    "mp3"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "ffmpeg-static": "^5.3.0",
     "multer": "^1.4.5-lts.1"
   }
 }

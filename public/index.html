@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AlexaAudio - Servidor Local de Streaming</title>
+  <title>AlexaAudio - Transmissor de Áudio Local</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,27 +16,43 @@
         <span class="icon">📻</span>
         <div>
           <h1>AlexaAudio Server</h1>
-          <p class="subtitle">Transmissor de Áudio Local para Amazon Echo</p>
+          <p class="subtitle">Transmissor de Áudio Local do PC para Amazon Echo</p>
         </div>
       </div>
       <div class="server-badge">
-        <span class="status-dot"></span> Online (Local)
+        <span class="status-dot"></span> Online (Tailscale)
       </div>
     </header>
 
+    <!-- Card: Modo de Transmissão -->
+    <section class="card mode-card">
+      <div class="mode-header">
+        <div>
+          <h2>🎛️ Fonte de Áudio para a Alexa</h2>
+          <p class="desc">Escolha se a Alexa deve transmitir o áudio do seu computador em tempo real ou arquivos MP3 específicos.</p>
+        </div>
+        <div class="mode-toggle">
+          <button id="btnModeLive" onclick="setMode('live')" class="btn-mode active">
+            🎙️ Áudio do PC ao Vivo
+          </button>
+          <button id="btnModeFile" onclick="setMode('file')" class="btn-mode">
+            📁 Arquivos MP3
+          </button>
+        </div>
+      </div>
+    </section>
+
     <div class="grid">
-      <!-- Card: Faixa Ativa & Player -->
+      <!-- Card: Player & Stream Ativo -->
       <section class="card active-card">
-        <h2>🎵 Faixa Ativa para a Alexa</h2>
-        <p class="desc">Este é o áudio que a Alexa reproduzirá ao receber o comando de voz.</p>
-        
+        <h2>🎵 Reprodução Ativa</h2>
         <div class="active-track-display">
-          <div class="track-title" id="activeTrackTitle">Nenhum áudio selecionado</div>
+          <div class="track-title" id="activeTrackTitle">🎙️ Transmitindo som do computador (Ao Vivo)</div>
           <audio id="audioPlayer" controls></audio>
         </div>
 
         <div class="endpoint-info">
-          <label>URL do Stream:</label>
+          <label>URL do Stream Atual:</label>
           <div class="copy-box">
             <input type="text" id="streamUrlInput" readonly value="Carregando...">
             <button onclick="copyToClipboard('streamUrlInput')" class="btn-secondary">Copiar</button>
@@ -46,31 +62,31 @@
 
       <!-- Card: Configuração de Túnel HTTPS -->
       <section class="card tunnel-card">
-        <h2>🌐 Túnel HTTPS (Cloudflare / Ngrok)</h2>
-        <p class="desc">A Alexa exige uma URL HTTPS com certificado SSL válido para tocar o áudio e acionar a skill.</p>
+        <h2>🌐 Conexão Segura (Tailscale Funnel)</h2>
+        <p class="desc">Endereço público oficial configurado para a Skill da Alexa.</p>
         
         <div class="form-group">
-          <label for="publicUrlInput">URL Pública do Túnel:</label>
+          <label for="publicUrlInput">URL Pública do Servidor:</label>
           <div class="input-group">
-            <input type="url" id="publicUrlInput" placeholder="Ex: https://meu-tunel.trycloudflare.com">
+            <input type="url" id="publicUrlInput" value="https://pc-gamer.tailf82141.ts.net">
             <button onclick="savePublicUrl()" class="btn-primary">Salvar</button>
           </div>
         </div>
 
         <div class="endpoint-info">
-          <label>Endpoint Webhook para Alexa Skill:</label>
+          <label>Endpoint Webhook da Alexa:</label>
           <div class="copy-box">
-            <input type="text" id="alexaWebhookInput" readonly value="...">
+            <input type="text" id="alexaWebhookInput" readonly value="https://pc-gamer.tailf82141.ts.net/alexa">
             <button onclick="copyToClipboard('alexaWebhookInput')" class="btn-secondary">Copiar</button>
           </div>
         </div>
       </section>
     </div>
 
-    <!-- Card: Biblioteca de Áudios -->
-    <section class="card library-card">
+    <!-- Card: Biblioteca de Arquivos MP3 -->
+    <section class="card library-card" id="librarySection">
       <div class="library-header">
-        <h2>📂 Biblioteca de Áudios Locais (pasta <code>media/</code>)</h2>
+        <h2>📂 Músicas Salvas no PC (pasta <code>media/</code>)</h2>
         <button onclick="document.getElementById('fileUpload').click()" class="btn-primary">
           ➕ Enviar Novo MP3
         </button>
@@ -86,21 +102,21 @@
       </div>
     </section>
 
-    <!-- Card: Comandos de Voz da Alexa -->
+    <!-- Card: Comandos de Voz -->
     <section class="card help-card">
-      <h2>🗣️ Como Usar com a Alexa</h2>
+      <h2>🗣️ O que falar para a Alexa</h2>
       <div class="commands-grid">
         <div class="cmd-item">
-          <strong>"Alexa, abrir Áudio Local"</strong>
-          <span>Inicia a reprodução do áudio ativo</span>
+          <strong>"Alexa, abrir áudio local"</strong>
+          <span>Inicia a transmissão imediata do som do PC</span>
         </div>
         <div class="cmd-item">
           <strong>"Alexa, pausar" / "Alexa, parar"</strong>
-          <span>Interrompe o fluxo de som</span>
+          <span>Interrompe a reprodução</span>
         </div>
         <div class="cmd-item">
-          <strong>"Alexa, próxima música"</strong>
-          <span>Avança para a próxima faixa da pasta</span>
+          <strong>"Alexa, continuar"</strong>
+          <span>Retoma a transmissão do áudio</span>
         </div>
       </div>
     </section>

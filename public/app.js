@@ -1,23 +1,45 @@
+let currentMode = 'live';
+
 async function fetchStatus() {
   try {
     const res = await fetch('/api/status');
     const data = await res.json();
 
-    // Atualiza Faixa Ativa
+    currentMode = data.playbackMode;
+
+    // Atualiza botões de modo
+    const btnLive = document.getElementById('btnModeLive');
+    const btnFile = document.getElementById('btnModeFile');
+    if (currentMode === 'live') {
+      btnLive.classList.add('active');
+      btnFile.classList.remove('active');
+    } else {
+      btnFile.classList.add('active');
+      btnLive.classList.remove('active');
+    }
+
+    // Atualiza Faixa Ativa / Display
     const titleEl = document.getElementById('activeTrackTitle');
     const audioPlayer = document.getElementById('audioPlayer');
     const streamUrlInput = document.getElementById('streamUrlInput');
     const publicUrlInput = document.getElementById('publicUrlInput');
     const alexaWebhookInput = document.getElementById('alexaWebhookInput');
 
-    if (data.activeTrack) {
-      titleEl.textContent = data.activeTrack;
-      if (!audioPlayer.src.includes(encodeURIComponent(data.activeTrack))) {
-        audioPlayer.src = data.streamUrl;
+    if (currentMode === 'live') {
+      titleEl.innerHTML = `🎙️ <strong>Áudio do PC ao Vivo</strong> (Transmitindo em tempo real)`;
+      if (audioPlayer.src !== data.liveStreamUrl) {
+        audioPlayer.src = data.liveStreamUrl;
       }
     } else {
-      titleEl.textContent = 'Nenhum áudio na pasta media/';
-      audioPlayer.src = '';
+      if (data.activeTrack) {
+        titleEl.textContent = `📁 Arquivo: ${data.activeTrack}`;
+        if (!audioPlayer.src.includes(encodeURIComponent(data.activeTrack))) {
+          audioPlayer.src = data.activeStreamUrl;
+        }
+      } else {
+        titleEl.textContent = 'Nenhum arquivo MP3 na pasta media/';
+        audioPlayer.src = '';
+      }
     }
 
     streamUrlInput.value = data.activeStreamUrl || '';
@@ -33,6 +55,22 @@ async function fetchStatus() {
   }
 }
 
+async function setMode(mode) {
+  try {
+    const res = await fetch('/api/mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    });
+    if (res.ok) {
+      showToast(mode === 'live' ? 'Modo Ao Vivo do PC ativado!' : 'Modo Arquivo MP3 ativado!');
+      fetchStatus();
+    }
+  } catch (err) {
+    showToast('Erro ao alternar modo', true);
+  }
+}
+
 function renderTrackList(tracks, activeTrack) {
   const trackListEl = document.getElementById('trackList');
   if (!tracks || tracks.length === 0) {
@@ -41,17 +79,15 @@ function renderTrackList(tracks, activeTrack) {
   }
 
   trackListEl.innerHTML = tracks.map(t => `
-    <div class="track-item ${t.name === activeTrack ? 'active' : ''}">
+    <div class="track-item ${currentMode === 'file' && t.name === activeTrack ? 'active' : ''}">
       <div>
         <div class="track-name">${t.name}</div>
         <div class="track-meta">${t.sizeMb} MB</div>
       </div>
       <div class="track-actions">
-        ${t.name !== activeTrack ? `
-          <button onclick="setActiveTrack('${encodeURIComponent(t.name)}')" class="btn-primary btn-sm">
-            Ativar para Alexa
-          </button>
-        ` : '<span style="color: var(--accent); font-size: 0.8rem; font-weight: 600;">⭐ Ativa</span>'}
+        <button onclick="setActiveTrack('${encodeURIComponent(t.name)}')" class="btn-primary btn-sm">
+          ${currentMode === 'file' && t.name === activeTrack ? '⭐ Tocando' : 'Tocar este'}
+        </button>
         <button onclick="deleteTrack('${encodeURIComponent(t.name)}')" class="btn-danger btn-sm">
           Excluir
         </button>
@@ -69,7 +105,7 @@ async function setActiveTrack(name) {
       body: JSON.stringify({ track: decoded }),
     });
     if (res.ok) {
-      showToast(`Faixa ativa alterada para: ${decoded}`);
+      showToast(`Modo arquivo ativado com: ${decoded}`);
       fetchStatus();
     }
   } catch (err) {
