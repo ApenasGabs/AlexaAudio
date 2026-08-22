@@ -8,7 +8,6 @@ const liveAudio = require('./liveAudio');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configuração de diretórios
 const MEDIA_DIR = path.join(__dirname, '..', 'media');
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
@@ -16,7 +15,6 @@ if (!fs.existsSync(MEDIA_DIR)) {
   fs.mkdirSync(MEDIA_DIR, { recursive: true });
 }
 
-// Configuração do upload de arquivos de áudio
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, MEDIA_DIR),
   filename: (req, file, cb) => {
@@ -36,15 +34,13 @@ const upload = multer({
   },
 });
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.static(PUBLIC_DIR));
 
-// Estado em memória
 let currentPublicUrl = process.env.PUBLIC_URL || 'https://pc-gamer.tailf82141.ts.net';
 let currentTrack = null;
-let playbackMode = 'live'; // 'live' (áudio do PC) ou 'file' (arquivo MP3)
+let playbackMode = 'live';
 
 function getTracks() {
   const files = fs.readdirSync(MEDIA_DIR);
@@ -59,7 +55,6 @@ function getActiveTrack() {
   return currentTrack;
 }
 
-// Inicia captura de áudio do sistema em tempo real
 liveAudio.start();
 
 // ==========================================
@@ -158,7 +153,6 @@ app.delete('/api/tracks/:filename', (req, res) => {
 // ROTAS DE STREAMING (Live & Arquivos)
 // ==========================================
 
-// Transmissão contínua do áudio do computador em tempo real
 app.get('/stream/live', (req, res) => {
   console.log(`[HTTP /stream/live] Conexão recebida de ${req.ip}`);
 
@@ -170,16 +164,11 @@ app.get('/stream/live', (req, res) => {
     'Expires': '0',
     'Accept-Ranges': 'none',
     'Access-Control-Allow-Origin': '*',
-    'icy-notice1': 'AlexaAudio Live PC Stream',
-    'icy-name': 'PC Audio Live',
-    'icy-genre': 'Live',
-    'icy-br': '128',
   });
 
   liveAudio.addClient(res);
 });
 
-// Stream de arquivo com suporte a Range
 function streamAudioFile(filePath, req, res) {
   if (!fs.existsSync(filePath)) {
     return res.status(404).send('Áudio não encontrado.');
@@ -242,7 +231,7 @@ app.post('/alexa', (req, res) => {
   const requestType = alexaRequest?.request?.type;
   const intentName = alexaRequest?.request?.intent?.name;
 
-  console.log(`[Alexa Request] Type: ${requestType}, Intent: ${intentName || 'N/A'}, Mode: ${playbackMode}`);
+  console.log(`[Alexa Full Request]`, JSON.stringify(alexaRequest));
 
   const active = getActiveTrack();
   const protocol = req.headers['x-forwarded-proto'] || req.protocol;
@@ -253,22 +242,14 @@ app.post('/alexa', (req, res) => {
   const streamUrl = isLive 
     ? `${baseUrl}/stream/live` 
     : `${baseUrl}/stream/${encodeURIComponent(active || 'sample_song.mp3')}`;
-  
-  const speechText = isLive 
-    ? 'Transmitindo som do computador' 
-    : `Tocando ${active ? active.replace(/\.[^/.]+$/, '') : 'áudio local'}`;
     
   const title = isLive ? 'Áudio do PC ao Vivo' : (active || 'Áudio Local');
-  const token = isLive ? `live-token-${Date.now()}` : (active || `file-${Date.now()}`);
+  const token = isLive ? `live-stream` : (active || `file-stream`);
 
-  const buildAudioResponse = (speech, audioUrl, itemToken) => {
+  const buildAudioResponse = (audioUrl, itemToken) => {
     return {
       version: '1.0',
       response: {
-        outputSpeech: speech ? {
-          type: 'PlainText',
-          text: speech,
-        } : undefined,
         directives: [
           {
             type: 'AudioPlayer.Play',
@@ -300,14 +281,14 @@ app.post('/alexa', (req, res) => {
   });
 
   if (requestType === 'LaunchRequest') {
-    return res.json(buildAudioResponse(speechText, streamUrl, token));
+    return res.json(buildAudioResponse(streamUrl, token));
   }
 
   if (requestType === 'IntentRequest') {
     switch (intentName) {
       case 'PlayIntent':
       case 'AMAZON.ResumeIntent':
-        return res.json(buildAudioResponse(speechText, streamUrl, token));
+        return res.json(buildAudioResponse(streamUrl, token));
 
       case 'AMAZON.PauseIntent':
       case 'AMAZON.StopIntent':
@@ -316,7 +297,7 @@ app.post('/alexa', (req, res) => {
 
       case 'AMAZON.NextIntent':
         if (isLive) {
-          return res.json(buildAudioResponse('Transmitindo áudio ao vivo do computador', `${baseUrl}/stream/live`, `live-token-${Date.now()}`));
+          return res.json(buildAudioResponse(`${baseUrl}/stream/live`, `live-stream`));
         }
         const tracks = getTracks();
         if (tracks.length > 1) {
@@ -324,7 +305,7 @@ app.post('/alexa', (req, res) => {
           const nextIndex = (currentIndex + 1) % tracks.length;
           currentTrack = tracks[nextIndex];
         }
-        return res.json(buildAudioResponse(`Próxima: ${currentTrack}`, `${baseUrl}/stream/${encodeURIComponent(currentTrack)}`, currentTrack));
+        return res.json(buildAudioResponse(`${baseUrl}/stream/${encodeURIComponent(currentTrack)}`, currentTrack));
 
       case 'AMAZON.HelpIntent':
         return res.json({
@@ -332,7 +313,7 @@ app.post('/alexa', (req, res) => {
           response: {
             outputSpeech: {
               type: 'PlainText',
-              text: 'Você pode pedir para tocar o áudio do seu computador ou controlar arquivos de som.',
+              text: 'Você pode pedir para tocar o áudio do seu computador.',
             },
             shouldEndSession: false,
           },
@@ -344,7 +325,7 @@ app.post('/alexa', (req, res) => {
           response: {
             outputSpeech: {
               type: 'PlainText',
-              text: 'Comando não reconhecido pelo servidor local.',
+              text: 'Comando não reconhecido.',
             },
             shouldEndSession: true,
           },
