@@ -56,21 +56,22 @@ function getActiveTrack() {
   return currentTrack;
 }
 
-// Inicia captura de áudio nativa
+// Inicia captura de áudio nativa contínua
 liveAudio.start();
 
-// Configura a Skill oficial com callback dinâmico de URL
+// Configura a Skill oficial com suporte a chime e fila
 const skill = createAlexaSkill(() => {
   const active = getActiveTrack();
   const baseUrl = currentPublicUrl;
   const isLive = playbackMode === 'live';
 
   return {
+    chimeUrl: `${baseUrl}/stream/connect_chime.mp3`,
     url: isLive 
       ? `${baseUrl}/stream/live` 
       : `${baseUrl}/stream/${encodeURIComponent(active || 'sample_song.mp3')}`,
     title: isLive ? 'Áudio do PC ao Vivo' : (active || 'Áudio Local'),
-    token: isLive ? `live-${Date.now()}` : (active || `file-${Date.now()}`),
+    token: isLive ? 'live-stream-continuous' : (active || `file-${Date.now()}`),
   };
 });
 
@@ -184,7 +185,7 @@ app.get('/stream/live', (req, res) => {
     'icy-notice1': 'AlexaAudio Live PC Stream',
     'icy-name': 'PC Audio Live',
     'icy-genre': 'Live',
-    'icy-br': '128',
+    'icy-br': '192',
   });
 
   liveAudio.addClient(res);
