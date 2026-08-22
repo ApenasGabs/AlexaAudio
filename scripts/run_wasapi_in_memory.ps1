@@ -20,6 +20,8 @@ public class WasapiStreamer
     private static TcpClient client;
     private static NetworkStream stream;
     private static WasapiLoopbackCapture capture;
+    private static long lastDataTicks = 0;
+    private static bool isRunning = true;
 
     public static void Start(string host, int port)
     {
@@ -36,6 +38,8 @@ public class WasapiStreamer
                 capture.WaveFormat.SampleRate, capture.WaveFormat.Channels, capture.WaveFormat.BitsPerSample));
             Console.Error.Flush();
 
+            lastDataTicks = DateTime.UtcNow.Ticks;
+
             capture.DataAvailable += (s, e) =>
             {
                 if (e.BytesRecorded > 0)
@@ -43,6 +47,7 @@ public class WasapiStreamer
                     try
                     {
                         stream.Write(e.Buffer, 0, e.BytesRecorded);
+                        Interlocked.Exchange(ref lastDataTicks, DateTime.UtcNow.Ticks);
                     }
                     catch (Exception)
                     {
@@ -58,7 +63,39 @@ public class WasapiStreamer
 
             capture.StartRecording();
 
-            while (true)
+            // Thread de Heartbeat de Silêncio: se o Windows estiver mudo,
+            // injeta silêncio a cada 20ms para manter o encoder FFmpeg e o stream da Alexa vivos e em tempo real!
+            // 48000Hz * 2 canais * 4 bytes (float32) * 0.02s = 7680 bytes a cada 20ms
+            int silenceBytes = (int)(capture.WaveFormat.SampleRate * capture.WaveFormat.Channels * (capture.WaveFormat.BitsPerSample / 8) * 0.02);
+            byte[] silenceBuffer = new byte[silenceBytes];
+
+            var silenceThread = new Thread(() =>
+            {
+                while (isRunning)
+                {
+                    Thread.Sleep(20);
+                    long last = Interlocked.Read(ref lastDataTicks);
+                    long diffMs = (DateTime.UtcNow.Ticks - last) / TimeSpan.TicksPerMillisecond;
+
+                    // Se não houver som ativo há mais de 40ms, envia frame de silêncio contínuo
+                    if (diffMs > 40)
+                    {
+                        try
+                        {
+                            stream.Write(silenceBuffer, 0, silenceBuffer.Length);
+                        }
+                        catch (Exception)
+                        {
+                            Environment.Exit(0);
+                        }
+                    }
+                }
+            });
+
+            silenceThread.IsBackground = true;
+            silenceThread.Start();
+
+            while (isRunning)
             {
                 Thread.Sleep(500);
             }
@@ -70,6 +107,7 @@ public class WasapiStreamer
         }
         finally
         {
+            isRunning = false;
             if (capture != null) { try { capture.StopRecording(); capture.Dispose(); } catch {} }
             if (stream != null) { try { stream.Close(); } catch {} }
             if (client != null) { try { client.Close(); } catch {} }
