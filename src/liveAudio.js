@@ -13,6 +13,11 @@ class LiveAudioCapture extends EventEmitter {
     this.isRunning = false;
     this.clients = new Set();
     this.port = 3001;
+
+    // Buffer circular para pré-buffer inicial dos ouvintes (~64KB de áudio MP3)
+    this.bufferCache = [];
+    this.bufferCacheSize = 0;
+    this.maxCacheSize = 64 * 1024; // 64 KB
   }
 
   start() {
@@ -36,6 +41,15 @@ class LiveAudioCapture extends EventEmitter {
       socket.pipe(this.ffmpegProcess.stdin);
 
       this.ffmpegProcess.stdout.on('data', (chunk) => {
+        // Atualiza o buffer circular inicial
+        this.bufferCache.push(chunk);
+        this.bufferCacheSize += chunk.length;
+
+        while (this.bufferCacheSize > this.maxCacheSize && this.bufferCache.length > 0) {
+          const removed = this.bufferCache.shift();
+          this.bufferCacheSize -= removed.length;
+        }
+
         // Transmite o chunk de MP3 para todos os clientes conectados (Alexas/Navegadores)
         for (const client of this.clients) {
           try {
@@ -44,6 +58,10 @@ class LiveAudioCapture extends EventEmitter {
             this.removeClient(client);
           }
         }
+      });
+
+      this.ffmpegProcess.stderr.on('data', (d) => {
+        // Silencia logs comuns do ffmpeg
       });
 
       this.ffmpegProcess.on('error', (err) => {
@@ -85,6 +103,17 @@ class LiveAudioCapture extends EventEmitter {
   }
 
   addClient(res) {
+    // Envia o pré-buffer acumulado para o player (Alexa/Navegador) iniciar instantaneamente
+    if (this.bufferCache.length > 0) {
+      for (const chunk of this.bufferCache) {
+        try {
+          res.write(chunk);
+        } catch (e) {
+          return;
+        }
+      }
+    }
+
     this.clients.add(res);
     res.on('close', () => this.removeClient(res));
     console.log(`[LiveAudio] Novo ouvinte conectado. Total de ouvintes: ${this.clients.size}`);
