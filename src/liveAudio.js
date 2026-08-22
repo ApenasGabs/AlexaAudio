@@ -14,11 +14,10 @@ class LiveAudioCapture extends EventEmitter {
     this.clients = new Set();
     this.port = 3001;
 
-    // Ring buffer aumentado para 128KB (~8 segundos a 128kbps) para suportar
-    // conexões simultâneas de múltiplos Echos no modo "A Casa Toda"
+    // Ring buffer aumentado para 128KB (~6-8s de pré-buffer)
     this.bufferCache = [];
     this.bufferCacheSize = 0;
-    this.maxCacheSize = 128 * 1024; // 128 KB
+    this.maxCacheSize = 128 * 1024;
   }
 
   start() {
@@ -27,13 +26,16 @@ class LiveAudioCapture extends EventEmitter {
     this.server = net.createServer((socket) => {
       console.log('[LiveAudio] 🎧 Conexão WASAPI nativa estabelecida.');
 
+      // FFmpeg com filtro de ganho inteligente (volume boost + limiter para não distorcer)
+      // e bitrate de 192 kbps para qualidade de som nítida e encorpada
       this.ffmpegProcess = spawn(ffmpegPath, [
         '-f', 'f32le',
         '-ar', '48000',
         '-ac', '2',
         '-i', 'pipe:0',
+        '-af', 'volume=1.75,alimiter=limit=0.98', // Amplifica o som sem clipar
         '-c:a', 'libmp3lame',
-        '-b:a', '128k',
+        '-b:a', '192k',
         '-flush_packets', '1',
         '-f', 'mp3',
         'pipe:1'
@@ -42,7 +44,6 @@ class LiveAudioCapture extends EventEmitter {
       socket.pipe(this.ffmpegProcess.stdin);
 
       this.ffmpegProcess.stdout.on('data', (chunk) => {
-        // Armazena no cache inicial
         this.bufferCache.push(chunk);
         this.bufferCacheSize += chunk.length;
 
@@ -51,7 +52,6 @@ class LiveAudioCapture extends EventEmitter {
           this.bufferCacheSize -= removed.length;
         }
 
-        // Distribui para todos os Echos conectados
         for (const client of this.clients) {
           try {
             client.write(chunk);
@@ -100,7 +100,6 @@ class LiveAudioCapture extends EventEmitter {
   }
 
   addClient(res) {
-    // Envia o pré-buffer completo para sincronizar múltiplos Echos instantaneamente
     if (this.bufferCache.length > 0) {
       for (const chunk of this.bufferCache) {
         try {
