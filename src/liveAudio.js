@@ -30,7 +30,7 @@ class LiveAudioCapture extends EventEmitter {
     this.ffmpegProcess = null;
     this.isRunning = false;
     this.clients = new Set();
-    this.port = 3001;
+    this.port = parseInt(process.env.LOCAL_AUDIO_PORT, 10) || 3001;
 
     // Buffer de 64KB (~4s a 128kbps) para pré-carregamento instantâneo
     this.bufferCache = [];

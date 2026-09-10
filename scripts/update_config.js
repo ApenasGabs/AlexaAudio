@@ -1,9 +1,13 @@
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const http = require('http');
+
+const PORT = process.env.PORT || 3000;
+const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 
 const req = http.request(
   {
     hostname: '127.0.0.1',
-    port: 3000,
+    port: PORT,
     path: '/api/config',
     method: 'POST',
     headers: {
@@ -17,5 +21,6 @@ const req = http.request(
   }
 );
 
-req.write(JSON.stringify({ publicUrl: 'https://pc-gamer.tailf82141.ts.net' }));
+req.write(JSON.stringify({ publicUrl: PUBLIC_URL }));
 req.end();
+

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -39,7 +40,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(PUBLIC_DIR));
 
-let currentPublicUrl = process.env.PUBLIC_URL || 'https://pc-gamer.tailf82141.ts.net';
+let currentPublicUrl = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
 let currentTrack = null;
 let playbackMode = 'live';
 
@@ -266,6 +267,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🎵 AlexaAudio Server rodando em: http://localhost:${PORT}`);
   console.log(`📡 Modo de transmissão ativo: ${playbackMode.toUpperCase()}`);
   console.log(`🌐 Web UI: http://localhost:${PORT}`);
-  console.log(`🔗 Public URL: ${currentPublicUrl}`);
+  console.log(`🔗 Public URL: ${currentPublicUrl || `http://localhost:${PORT}`}`);
   console.log('====================================================');
 });

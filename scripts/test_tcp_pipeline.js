@@ -1,7 +1,10 @@
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const net = require('net');
 const { spawn } = require('child_process');
 const path = require('path');
 const ffmpegPath = require('ffmpeg-static');
+
+const TCP_PORT = parseInt(process.env.LOCAL_AUDIO_PORT, 10) || 3001;
 
 // 1. Cria servidor TCP local para receber áudio bruto PCM
 const server = net.createServer((socket) => {
@@ -36,8 +39,8 @@ const server = net.createServer((socket) => {
   socket.on('close', () => ffmpeg.kill());
 });
 
-server.listen(3001, '127.0.0.1', () => {
-  console.log('Servidor TCP de áudio escutando na porta 3001...');
+server.listen(TCP_PORT, '127.0.0.1', () => {
+  console.log(`Servidor TCP de áudio escutando na porta ${TCP_PORT}...`);
 
   // 3. Inicia capturador PowerShell conectando via TCP
   const ps = spawn('powershell.exe', [

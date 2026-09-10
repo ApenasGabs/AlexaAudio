@@ -1,8 +1,10 @@
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const http = require('http');
 
+const PORT = process.env.PORT || 3000;
 console.log('Monitorando taxa de transferência do stream local...');
 
-const req = http.get('http://127.0.0.1:3000/stream/live.mp3', (res) => {
+const req = http.get(`http://127.0.0.1:${PORT}/stream/live.mp3`, (res) => {
   let bytesReceived = 0;
   let lastTime = Date.now();
 

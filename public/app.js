@@ -45,7 +45,7 @@ async function fetchStatus() {
     streamUrlInput.value = data.activeStreamUrl || '';
     alexaWebhookInput.value = data.alexaWebhookUrl || '';
 
-    if (!publicUrlInput.value && data.publicUrl) {
+    if (document.activeElement !== publicUrlInput && data.publicUrl) {
       publicUrlInput.value = data.publicUrl;
     }
 

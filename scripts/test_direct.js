@@ -1,9 +1,12 @@
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const http = require('http');
+
+const PORT = process.env.PORT || 3000;
 
 const req = http.request(
   {
     hostname: '127.0.0.1',
-    port: 3000,
+    port: PORT,
     path: '/alexa',
     method: 'POST',
     headers: {

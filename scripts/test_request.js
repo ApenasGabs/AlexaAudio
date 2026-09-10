@@ -1,4 +1,7 @@
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const http = require('http');
+
+const PORT = process.env.PORT || 3000;
 
 function sendPost(path, data) {
   return new Promise((resolve, reject) => {
@@ -6,7 +9,7 @@ function sendPost(path, data) {
     const req = http.request(
       {
         hostname: '127.0.0.1',
-        port: 3000,
+        port: PORT,
         path,
         method: 'POST',
         headers: {

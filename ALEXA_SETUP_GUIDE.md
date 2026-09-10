@@ -63,8 +63,8 @@ Ele gerará uma URL como: `https://xxxx.ngrok-free.app`
 5. **Configurar o Endpoint Webhook:**
    - No menu lateral, vá em **Endpoint**.
    - Selecione **HTTPS**.
-   - No campo **Default Region**, cole o seu endpoint do webhook:
-     `https://pc-gamer.tailf82141.ts.net/alexa`
+   - No campo **Default Region**, cole o endpoint do seu webhook (definido em `PUBLIC_URL` no arquivo `.env` + `/alexa`), por exemplo:
+     `https://seu-dominio.ts.net/alexa` (ou o seu domínio Tailscale / ngrok configurado no `.env`).
    - No dropdown de certificado SSL (*Select SSL certificate type*), selecione:
      `My development endpoint is a sub-domain of a domain that has a wildcard certificate from a certificate authority` (*.ts.net possui certificado wildcard confiável).
    - Clique em **Save Endpoints**.

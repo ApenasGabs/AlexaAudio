@@ -1,8 +1,12 @@
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const { createAlexaSkill } = require('../src/alexaSkill');
 
+const PUBLIC_URL = process.env.PUBLIC_URL || 'http://localhost:3000';
+
 const skill = createAlexaSkill(() => ({
-  introUrl: 'https://pc-gamer.tailf82141.ts.net/stream/intro_fixed.mp3',
-  liveUrl: 'https://pc-gamer.tailf82141.ts.net/stream/live',
+  url: `${PUBLIC_URL}/stream/live.mp3`,
+  title: 'Áudio do PC ao Vivo',
+  token: `live-stream-${Date.now()}`,
 }));
 
 const payload = {
